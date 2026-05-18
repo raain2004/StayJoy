@@ -1,0 +1,21 @@
+# Copy this file to terraform.tfvars and fill in your values
+
+key_name = "your-aws-key-pair-name"
+
+app_env = {
+  NEXT_PUBLIC_SUPABASE_URL     = "https://your-project.supabase.co"
+  NEXT_PUBLIC_SUPABASE_ANON_KEY = "your-anon-key"
+  SUPABASE_SERVICE_ROLE_KEY    = "your-service-role-key"
+  KNOWLEDGE_BASE_API_KEY       = "stayjoy-kb-secret-2024"
+  GEMINI_API_KEY               = "your-gemini-api-key"
+
+  # n8n
+  N8N_USER     = "admin"
+  N8N_PASSWORD = "stayjoy2024"
+
+  # Chatwoot
+  CHATWOOT_SECRET_KEY = "replace_with_output_of_openssl_rand_hex_32"
+
+  # Public IP (update after terraform apply)
+  PUBLIC_IP = "YOUR_ELASTIC_IP"
+}

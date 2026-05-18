@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.kiro
+.vscode
+infra
+*.md
+.env.local
+.env
+tsconfig.tsbuildinfo

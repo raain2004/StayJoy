@@ -1,27 +1,35 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Bot, type LucideIcon } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Bot, Cpu, CreditCard, LogOut, TableOfContents, CalendarCheck2, ClipboardList, ClipboardCheck, Building, MessageCircle, Wallet2, PieChart, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 
 const navItems: { href: string; label: string; icon?: LucideIcon }[] = [
-  { href: '/dashboard', label: 'Tổng Quan' },
-  { href: '/dashboard/calendar', label: 'Lịch Phòng' },
-  { href: '/dashboard/bookings', label: 'Quản Lý Booking' },
-  { href: '/dashboard/services', label: 'Yêu Cầu Dịch Vụ' },
-  { href: '/dashboard/revenue', label: 'Doanh Thu' },
-  { href: '/dashboard/rooms', label: 'Quản Lý Phòng' },
-  { href: '/dashboard/conversations', label: 'Hội Thoại' },
+  { href: '/dashboard', label: 'Tổng Quan', icon: TableOfContents },
+  { href: '/dashboard/calendar', label: 'Lịch Phòng', icon: CalendarCheck2 },
+  { href: '/dashboard/bookings', label: 'Yêu Cầu Đặt Phòng', icon: ClipboardList },
+  { href: '/dashboard/services', label: 'Yêu Cầu Dịch Vụ', icon: ClipboardCheck },
+  { href: '/dashboard/rooms', label: 'Quản Lý Phòng', icon: Building },
+  { href: '/dashboard/conversations', label: 'Hội Thoại', icon: MessageCircle },
   { href: '/dashboard/ai-chatbot', label: 'AI Chatbot', icon: Bot },
-  { href: '/dashboard/settings', label: 'Cài Đặt' },
+  { href: '/dashboard/usage', label: 'Sử Dụng AI', icon: Cpu },
+  { href: '/dashboard/billing', label: 'Ví & Thanh Toán', icon: CreditCard },
 ]
 
 export function SidebarNav() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   return (
-    <nav className="flex flex-col gap-1 px-3 py-4">
+    <nav className="flex flex-col gap-1 px-3 py-4 flex-1">
       {navItems.map(({ href, label, icon: Icon }) => {
         const isActive =
           href === '/dashboard' ? pathname === href : pathname.startsWith(href)
@@ -42,6 +50,15 @@ export function SidebarNav() {
           </Link>
         )
       })}
+      <div className="mt-auto pt-4 border-t">
+        <button
+          onClick={handleLogout}
+          className="w-full rounded-md px-3 py-2 text-sm font-medium transition-colors flex items-center gap-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        >
+          <LogOut className="h-4 w-4" />
+          Đăng xuất
+        </button>
+      </div>
     </nav>
   )
 }

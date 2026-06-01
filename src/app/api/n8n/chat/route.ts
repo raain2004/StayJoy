@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { callLLM } from '@/lib/llm/provider'
 import { buildSystemMessage, KnowledgeSection, Room } from '@/lib/knowledge-base/builder'
+import { debounceMessage } from '@/lib/message-debounce'
 
 function createServiceClient() {
   return createClient(
@@ -55,6 +56,22 @@ export async function POST(request: NextRequest) {
     if (!inbox_id && !directPropertyId) {
       return NextResponse.json({ error: 'inbox_id or property_id is required' }, { status: 400 })
     }
+
+    // Debounce: gom nhiều tin nhắn liên tiếp từ cùng conversation
+    const conversationId = body.conversation_id || `${inbox_id}-unknown`
+    const debouncedMessage = debounceMessage(conversationId, message)
+
+    if (debouncedMessage === null) {
+      // Tin nhắn này đã được gom vào batch đang chờ → skip, không xử lý
+      return NextResponse.json({
+        answer: '__DEBOUNCED__',
+        debounced: true,
+        message: 'Message queued, waiting for more input',
+      })
+    }
+
+    // Chờ debounce hoàn tất (3s sau tin nhắn cuối cùng)
+    const combinedMessage = await debouncedMessage
 
     const supabase = createServiceClient()
     let propertyId = directPropertyId
@@ -125,7 +142,7 @@ export async function POST(request: NextRequest) {
 
     // Call LLM with property-specific config
     const llmResponse = await callLLM(
-      { systemMessage, userMessage: message },
+      { systemMessage, userMessage: combinedMessage },
       propertyId
     )
 

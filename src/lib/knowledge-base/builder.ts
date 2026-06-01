@@ -111,6 +111,11 @@ export function buildRoomsPricingBlock(
  * Builds the complete system message string from a list of knowledge base
  * sections and a list of rooms.
  *
+ * Structure:
+ *   1. System instruction (personality, rules, behavior)
+ *   2. Knowledge base content (sections sorted by sort_order)
+ *   3. Behavioral guidelines (when to upsell, when to notify owner)
+ *
  * Sorting (Requirement 2.3):
  *   Primary   — sort_order ASC
  *   Secondary — section_key ASC (alphabetical fallback)
@@ -128,8 +133,15 @@ export function buildRoomsPricingBlock(
  */
 export function buildSystemMessage(
   sections: KnowledgeSection[],
-  rooms: Room[]
+  rooms: Room[],
+  plan?: string
 ): string {
+  // Return '' when there are no active sections and no rooms
+  const activeSections = sections.filter((s) => s.is_active)
+  if (activeSections.length === 0 && rooms.length === 0) {
+    return ''
+  }
+
   // Sort: sort_order ASC, then section_key ASC as alphabetical fallback
   const sorted = [...sections].sort((a, b) => {
     if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order
@@ -146,7 +158,8 @@ export function buildSystemMessage(
   // Pre-compute the rooms_pricing block so we can decide whether to include it
   const roomsBlock = buildRoomsPricingBlock(roomsPricingSection, roomsTable)
 
-  const parts: string[] = []
+  // --- Build knowledge content ---
+  const contentParts: string[] = []
 
   // Track whether rooms_pricing has been emitted via the sorted loop
   let roomsPricingEmitted = false
@@ -155,7 +168,7 @@ export function buildSystemMessage(
     if (section.section_key === 'rooms_pricing') {
       // Always process rooms_pricing in its sorted position
       if (roomsBlock !== null) {
-        parts.push(roomsBlock)
+        contentParts.push(roomsBlock)
         roomsPricingEmitted = true
       }
       continue
@@ -164,14 +177,91 @@ export function buildSystemMessage(
     // All other sections: skip if inactive
     if (!section.is_active) continue
 
-    parts.push(`## ${section.title}\n\n${section.content}`)
+    contentParts.push(`## ${section.title}\n\n${section.content}`)
   }
 
   // If rooms_pricing was not in the sorted list but we still have rooms,
   // append the rooms block at the end (edge case: no section record exists)
   if (!roomsPricingEmitted && roomsBlock !== null) {
-    parts.push(roomsBlock)
+    contentParts.push(roomsBlock)
   }
 
-  return parts.join('\n\n---\n\n')
+  const knowledgeContent = contentParts.join('\n\n---\n\n')
+
+  // --- Build full system message with instructions ---
+  const systemInstruction = buildSystemInstruction()
+  const behaviorGuidelines = buildBehaviorGuidelines(plan)
+
+  const finalParts: string[] = []
+  if (systemInstruction) finalParts.push(systemInstruction)
+  if (knowledgeContent) finalParts.push(knowledgeContent)
+  if (behaviorGuidelines) finalParts.push(behaviorGuidelines)
+
+  return finalParts.join('\n\n---\n\n')
+}
+
+// ---------------------------------------------------------------------------
+// System instruction (personality & tone)
+// ---------------------------------------------------------------------------
+
+function buildSystemInstruction(): string {
+  return `Bạn là lễ tân ảo của homestay. Xưng "em", gọi khách là "anh/chị".
+
+TÍNH CÁCH:
+- Thân thiện, nhiệt tình như lễ tân thật
+- Trả lời ngắn gọn (tối đa 3-4 câu), dễ hiểu, có emoji nhẹ nhàng
+- Chủ động gợi ý — không chờ khách hỏi hết mới nói
+- Dùng ngôn ngữ tự nhiên, không robot
+
+QUY TẮC:
+- Chỉ trả lời dựa trên thông tin được cung cấp bên dưới
+- KHÔNG tự bịa thông tin (giá, chính sách)
+- LUÔN LUÔN đối chiếu chính xác giá của từng phòng cụ thể (ví dụ: P101, P102,...) dựa vào bảng "Phòng & Giá" ở dưới. Tuyệt đối không được báo giá sai lệch hay tự ý giảm bớt số 0 (ví dụ: phòng đơn 500.000đ/đêm thì P101 phải đúng là 500.000đ/đêm, không được báo thành 50.000đ/đêm).
+- TUYỆT ĐỐI KHÔNG tự tiện xác nhận hay cam kết đặt phòng thành công (chỉ chủ nhà mới confirm được), chỉ ghi nhận thông tin khách cung cấp
+- TUYỆT ĐỐI KHÔNG sử dụng biểu tượng chắp tay cầu nguyện (🙏) trong bất kỳ câu trả lời nào.
+- Nếu không biết → nói "Em cần hỏi lại chủ nhà, anh/chị chờ chút nhé"`
+}
+
+// ---------------------------------------------------------------------------
+// Behavior guidelines (when to upsell, notify owner, etc.)
+// ---------------------------------------------------------------------------
+
+function buildBehaviorGuidelines(plan?: string): string {
+  const hasUpsell = plan === 'pro' || plan === 'premium'
+  const upsellSection = hasUpsell
+    ? `\n### KHI NÀO GỢI Ý DỊCH VỤ THÊM (UPSELL)
+- Khách hỏi "có gì vui không?" → giới thiệu dịch vụ thêm
+- Khách nói đi với người yêu/gia đình → gợi ý phù hợp (romance setup, BBQ...)
+- Khách đã muốn đặt phòng → gợi ý 1 dịch vụ thêm
+- KHÔNG upsell khi khách đang hỏi giá/chính sách cơ bản
+- Chỉ gợi ý 1 lần, khách không quan tâm thì thôi\n`
+    : ''
+
+  return `## HƯỚNG DẪN HÀNH VI
+
+### KHI KHÁCH HỎI THÔNG TIN (FAQ)
+- Trả lời ngay từ thông tin ở trên
+- Cuối câu gợi ý thêm: "Anh/chị có muốn em gửi hình phòng không ạ?" hoặc "Anh/chị đã chọn ngày chưa?"
+${upsellSection}
+### KHI KHÁCH MUỐN ĐẶT PHÒNG
+- Hỏi lần lượt (không hỏi hết 1 lúc):
+  1. Ngày check-in / check-out
+  2. Số người (gợi ý phòng phù hợp)
+  3. Họ tên + SĐT
+- Sau khi đủ: "Dạ em đã ghi nhận. Chủ nhà sẽ liên hệ anh/chị sớm nhất để xác nhận ạ!"
+
+### KHI KHÁCH YÊU CẦU DỊCH VỤ (đang ở homestay)
+- Hỏi: số phòng + yêu cầu cụ thể
+- "Dạ em ghi nhận rồi ạ. Nhân viên sẽ hỗ trợ sớm nhất!"
+
+### KHI KHÔNG GIẢI QUYẾT ĐƯỢC → THÔNG BÁO CHỦ NHÀ
+Trả lời khách "Em cần hỏi lại chủ nhà" khi:
+- Câu hỏi KHÔNG có trong thông tin ở trên
+- Khách phàn nàn/khiếu nại
+- Khách yêu cầu đặc biệt (dị ứng, yêu cầu riêng)
+- Khách hỏi giảm giá/nhóm lớn
+- Khách muốn nói chuyện trực tiếp với chủ nhà
+
+### KHI KHÁCH HỎI VỀ ĐỊA ĐIỂM KHÁC
+- "Dạ homestay em chỉ phục vụ tại đây thôi ạ." + giới thiệu homestay liên kết nếu có`
 }

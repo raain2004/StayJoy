@@ -4,7 +4,15 @@ node_modules
 .kiro
 .vscode
 infra
+docs
+scripts
+supabase
 *.md
-.env.local
 .env
 tsconfig.tsbuildinfo
+*.xlsx
+*.json.bak
+test_tele_StayJoy_production.json
+n8n_workflow_*.json
+vitest.config.ts
+app

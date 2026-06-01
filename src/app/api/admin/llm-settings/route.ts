@@ -115,7 +115,7 @@ export async function PUT(request: NextRequest) {
     )
   }
 
-  const validProviders = ['gemini', 'openai', 'anthropic', 'groq']
+  const validProviders = ['gemini', 'openai', 'anthropic', 'groq', 'openrouter']
   if (!validProviders.includes(provider)) {
     return NextResponse.json({ error: 'Invalid provider' }, { status: 400 })
   }

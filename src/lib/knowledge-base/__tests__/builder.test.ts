@@ -163,4 +163,40 @@ describe('buildSystemMessage', () => {
     const faqPos = result.indexOf('FAQ')
     expect(amenitiesPos).toBeLessThan(faqPos)
   })
+
+  it('does NOT include Upsell guidelines when plan is lite, trial, or undefined', () => {
+    const sections: KnowledgeSection[] = [
+      {
+        section_key: 'general_info',
+        title: 'Thông Tin Chung',
+        content: 'Homestay ABC',
+        is_active: true,
+        sort_order: 0,
+      },
+    ]
+    const resUndefined = buildSystemMessage(sections, [], undefined)
+    const resLite = buildSystemMessage(sections, [], 'lite')
+    const resTrial = buildSystemMessage(sections, [], 'trial')
+
+    expect(resUndefined).not.toContain('KHI NÀO GỢI Ý DỊCH VỤ THÊM (UPSELL)')
+    expect(resLite).not.toContain('KHI NÀO GỢI Ý DỊCH VỤ THÊM (UPSELL)')
+    expect(resTrial).not.toContain('KHI NÀO GỢI Ý DỊCH VỤ THÊM (UPSELL)')
+  })
+
+  it('includes Upsell guidelines when plan is pro or premium', () => {
+    const sections: KnowledgeSection[] = [
+      {
+        section_key: 'general_info',
+        title: 'Thông Tin Chung',
+        content: 'Homestay ABC',
+        is_active: true,
+        sort_order: 0,
+      },
+    ]
+    const resPro = buildSystemMessage(sections, [], 'pro')
+    const resPremium = buildSystemMessage(sections, [], 'premium')
+
+    expect(resPro).toContain('KHI NÀO GỢI Ý DỊCH VỤ THÊM (UPSELL)')
+    expect(resPremium).toContain('KHI NÀO GỢI Ý DỊCH VỤ THÊM (UPSELL)')
+  })
 })

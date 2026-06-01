@@ -41,29 +41,50 @@ export async function GET(request: NextRequest) {
   const inboxId = mapping?.inbox_id
 
   const inboxFilter = inboxId ? `&inbox_id=${inboxId}` : ''
-  const statusFilter = status !== 'all' ? `&status=${status}` : ''
 
-  const data = await chatwootFetch(
-    `/conversations?page=${page}${inboxFilter}${statusFilter}`
-  )
+  let allConversations: any[] = []
+  let meta: any = {}
 
+  if (status === 'all') {
+    // Chatwoot doesn't have a true "all" filter — fetch open + pending + resolved
+    const [openData, pendingData, resolvedData] = await Promise.all([
+      chatwootFetch(`/conversations?page=${page}${inboxFilter}&status=open`),
+      chatwootFetch(`/conversations?page=${page}${inboxFilter}&status=pending`),
+      chatwootFetch(`/conversations?page=${page}${inboxFilter}&status=resolved`),
+    ])
+
+    const openConvs = openData.data?.payload || []
+    const pendingConvs = pendingData.data?.payload || []
+    const resolvedConvs = resolvedData.data?.payload || []
+
+    allConversations = [...pendingConvs, ...openConvs, ...resolvedConvs]
+    meta = {
+      all_count: (openData.data?.meta?.all_count || 0) + (pendingData.data?.meta?.all_count || 0) + (resolvedData.data?.meta?.all_count || 0),
+      open_count: openData.data?.meta?.all_count || 0,
+      resolved_count: resolvedData.data?.meta?.all_count || 0,
+    }
+  } else {
+    const data = await chatwootFetch(
+      `/conversations?page=${page}${inboxFilter}&status=${status}`
+    )
+    allConversations = data.data?.payload || []
+    meta = data.data?.meta || {}
+  }
   // Calculate stats for current month
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000
-
-  const allConversations = data.data?.payload || []
   const thisMonth = allConversations.filter((c: any) => c.created_at >= startOfMonth)
 
   const stats = {
-    total: data.data?.meta?.all_count || 0,
-    open: data.data?.meta?.open_count || 0,
-    resolved: data.data?.meta?.resolved_count || 0,
+    total: meta.all_count || allConversations.length,
+    open: meta.open_count || 0,
+    resolved: meta.resolved_count || 0,
     thisMonth: thisMonth.length,
   }
 
   return NextResponse.json({
     conversations: allConversations,
-    meta: data.data?.meta || {},
+    meta: meta || {},
     stats,
   })
 }

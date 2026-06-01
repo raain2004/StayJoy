@@ -31,7 +31,7 @@ interface Subscription {
   properties: { id: string; name: string } | null
 }
 
-const PLANS = ['trial', 'basic', 'pro']
+const PLANS = ['trial', 'lite', 'pro', 'premium']
 const STATUSES = ['trial', 'active', 'expired', 'cancelled']
 
 export default function AdminSubscriptionsPage() {
@@ -121,7 +121,7 @@ export default function AdminSubscriptionsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {PLANS.map((p) => (
-                          <SelectItem key={p} value={p}>{p}</SelectItem>
+                          <SelectItem key={p} value={p}>{p.toUpperCase()}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

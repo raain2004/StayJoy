@@ -9,3 +9,5 @@ infra/terraform.tfvars
 *.pem
 .kiro/
 tsconfig.tsbuildinfo
+src.tar.gz
+test.py

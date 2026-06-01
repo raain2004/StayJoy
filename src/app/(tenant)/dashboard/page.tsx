@@ -3,20 +3,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { KPICard, KPICardSkeleton } from '@/components/dashboard/KPICard'
+import { QuotaCard } from '@/components/dashboard/QuotaCard'
 
 interface DashboardSummary {
   totalBookingsThisMonth: number
-  revenueThisMonth: number
+  totalConversationsThisMonth: number
   pendingServiceRequests: number
   vacancyRate: number
-}
-
-function formatVND(amount: number): string {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(amount)
 }
 
 function formatPercent(rate: number): string {
@@ -48,8 +41,12 @@ export default function DashboardPage() {
   }, [fetchSummary])
 
   return (
-    <div className="p-6">
-      <h1 className="mb-6 text-2xl font-bold">Tổng Quan</h1>
+    <div className="p-6 flex flex-col gap-6">
+      <div>
+        <h1 className="text-2xl font-bold">Tổng Quan</h1>
+      </div>
+
+      <QuotaCard />
 
       {error ? (
         <div className="flex flex-col items-center gap-4 rounded-lg border border-destructive/30 bg-destructive/10 p-8 text-center">
@@ -70,13 +67,13 @@ export default function DashboardPage() {
           ) : data ? (
             <>
               <KPICard
-                title="Tổng Booking Tháng"
+                title="Yêu Cầu Đặt Phòng"
                 value={data.totalBookingsThisMonth}
                 subtitle="Tháng hiện tại"
               />
               <KPICard
-                title="Doanh Thu Tháng"
-                value={formatVND(data.revenueThisMonth)}
+                title="Tổng Trò Chuyện Tháng"
+                value={data.totalConversationsThisMonth}
                 subtitle="Tháng hiện tại"
               />
               <KPICard

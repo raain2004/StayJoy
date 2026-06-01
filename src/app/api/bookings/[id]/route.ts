@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-const VALID_STATUSES = ['pending', 'confirmed', 'check-in', 'checked_in', 'đã cọc', 'đang ở', 'cancelled']
+const VALID_STATUSES = ['pending', 'confirmed', 'check-in', 'checked_in', 'đã cọc', 'đang ở', 'cancelled', 'mới', 'đã liên hệ', 'đã xử lý']
 
 export async function PATCH(
   request: NextRequest,

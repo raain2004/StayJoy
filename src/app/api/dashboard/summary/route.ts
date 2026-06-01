@@ -30,20 +30,14 @@ export async function GET() {
 
     if (bookingsCountError) throw bookingsCountError
 
-    // 2. Revenue this month: SUM(num_day * gia_dem) for active bookings with check_in in current month
-    const { data: revenueRows, error: revenueError } = await supabase
+    // 2. Total conversations this month (bookings with conversation_id)
+    const { count: totalConversationsThisMonth, error: convError } = await supabase
       .from('bookings')
-      .select('num_day, gia_dem')
-      .in('tinh_trang', ACTIVE_STATUSES)
-      .gte('check_in', firstDayOfMonth)
-      .lte('check_in', lastDayOfMonth)
+      .select('*', { count: 'exact', head: true })
+      .not('conversation_id', 'is', null)
+      .gte('timestamp', firstDayOfMonth)
 
-    if (revenueError) throw revenueError
-
-    const revenueThisMonth = (revenueRows ?? []).reduce(
-      (sum, row) => sum + (row.num_day ?? 0) * (row.gia_dem ?? 0),
-      0
-    )
+    if (convError) throw convError
 
     // 3. Pending service requests: trang_thai IN ('Mới', 'Đang xử lý')
     const { count: pendingServiceRequests, error: serviceError } = await supabase
@@ -78,7 +72,7 @@ export async function GET() {
 
     return NextResponse.json({
       totalBookingsThisMonth: totalBookingsThisMonth ?? 0,
-      revenueThisMonth,
+      totalConversationsThisMonth: totalConversationsThisMonth ?? 0,
       pendingServiceRequests: pendingServiceRequests ?? 0,
       vacancyRate,
     })

@@ -198,12 +198,12 @@ export default function ChannelsPage() {
       {/* Filter by property */}
       <div className="flex items-center gap-3">
         <Label>Lọc theo property:</Label>
-        <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+        <Select value={selectedPropertyId || 'all'} onValueChange={(v) => setSelectedPropertyId(v === 'all' ? '' : v)}>
           <SelectTrigger className="w-64">
             <SelectValue placeholder="Tất cả" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Tất cả</SelectItem>
+            <SelectItem value="all">Tất cả</SelectItem>
             {properties.map((p) => (
               <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
             ))}

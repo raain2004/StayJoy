@@ -15,9 +15,21 @@ export async function GET(request: NextRequest) {
   const dateTo = searchParams.get('date_to')
 
   try {
+    // Get the property_id for the current user to explicitly filter bookings
+    const { data: userProp, error: propError } = await supabase
+      .from('users_properties')
+      .select('property_id')
+      .eq('user_id', session.user.id)
+      .single()
+
+    if (propError || !userProp) {
+      return NextResponse.json({ bookings: [] })
+    }
+
     let query = supabase
       .from('bookings')
       .select('*')
+      .eq('property_id', userProp.property_id)
       .order('check_in', { ascending: false })
 
     if (status) {

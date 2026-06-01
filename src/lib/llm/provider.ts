@@ -1,7 +1,7 @@
 /**
  * LLM Provider — Multi-model support with fallback
  *
- * Supports: Gemini, OpenAI, Anthropic
+ * Supports: Gemini, OpenAI, Anthropic, Groq
  * Fallback: If primary model fails, tries next in chain
  *
  * Config priority:
@@ -28,26 +28,50 @@ export interface LLMResponse {
   answer: string
   provider: string
   model: string
+  usage?: {
+    inputTokens: number
+    outputTokens: number
+    totalTokens: number
+  }
 }
+
+type CallFunction = (req: LLMRequest, apiKey: string, model: string, plan?: string) => Promise<{
+  answer: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}>
 
 interface ProviderConfig {
   name: string
   apiKey: string | undefined
   model: string
-  call: (req: LLMRequest, apiKey: string, model: string) => Promise<string>
+  call: CallFunction
 }
 
 // --- Gemini ---
-async function callGemini(req: LLMRequest, apiKey: string, model: string): Promise<string> {
+async function callGemini(req: LLMRequest, apiKey: string, model: string, plan?: string): Promise<{
+  answer: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+
+  const requestBody: any = {
+    contents: [{ parts: [{ text: req.userMessage }] }],
+    systemInstruction: { parts: [{ text: req.systemMessage }] },
+  }
+
+  // Inject Google Search Grounding tool if the property is on the PREMIUM tier
+  if (plan === 'premium') {
+    requestBody.tools = [{ google_search: {} }]
+  }
 
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: req.userMessage }] }],
-      systemInstruction: { parts: [{ text: req.systemMessage }] },
-    }),
+    body: JSON.stringify(requestBody),
   })
 
   if (!response.ok) {
@@ -56,11 +80,21 @@ async function callGemini(req: LLMRequest, apiKey: string, model: string): Promi
   }
 
   const data = await response.json()
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+  const answer = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+  const inputTokens = data?.usageMetadata?.promptTokenCount ?? 0
+  const outputTokens = data?.usageMetadata?.candidatesTokenCount ?? 0
+  const totalTokens = data?.usageMetadata?.totalTokenCount ?? (inputTokens + outputTokens)
+
+  return { answer, inputTokens, outputTokens, totalTokens }
 }
 
 // --- OpenAI ---
-async function callOpenAI(req: LLMRequest, apiKey: string, model: string): Promise<string> {
+async function callOpenAI(req: LLMRequest, apiKey: string, model: string, plan?: string): Promise<{
+  answer: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}> {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -83,11 +117,21 @@ async function callOpenAI(req: LLMRequest, apiKey: string, model: string): Promi
   }
 
   const data = await response.json()
-  return data?.choices?.[0]?.message?.content ?? ''
+  const answer = data?.choices?.[0]?.message?.content ?? ''
+  const inputTokens = data?.usage?.prompt_tokens ?? 0
+  const outputTokens = data?.usage?.completion_tokens ?? 0
+  const totalTokens = data?.usage?.total_tokens ?? (inputTokens + outputTokens)
+
+  return { answer, inputTokens, outputTokens, totalTokens }
 }
 
 // --- Anthropic ---
-async function callAnthropic(req: LLMRequest, apiKey: string, model: string): Promise<string> {
+async function callAnthropic(req: LLMRequest, apiKey: string, model: string, plan?: string): Promise<{
+  answer: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}> {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -109,11 +153,21 @@ async function callAnthropic(req: LLMRequest, apiKey: string, model: string): Pr
   }
 
   const data = await response.json()
-  return data?.content?.[0]?.text ?? ''
+  const answer = data?.content?.[0]?.text ?? ''
+  const inputTokens = data?.usage?.input_tokens ?? 0
+  const outputTokens = data?.usage?.output_tokens ?? 0
+  const totalTokens = inputTokens + outputTokens
+
+  return { answer, inputTokens, outputTokens, totalTokens }
 }
 
 // --- Groq ---
-async function callGroq(req: LLMRequest, apiKey: string, model: string): Promise<string> {
+async function callGroq(req: LLMRequest, apiKey: string, model: string, plan?: string): Promise<{
+  answer: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}> {
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -136,16 +190,61 @@ async function callGroq(req: LLMRequest, apiKey: string, model: string): Promise
   }
 
   const data = await response.json()
-  return data?.choices?.[0]?.message?.content ?? ''
+  const answer = data?.choices?.[0]?.message?.content ?? ''
+  const inputTokens = data?.usage?.prompt_tokens ?? 0
+  const outputTokens = data?.usage?.completion_tokens ?? 0
+  const totalTokens = data?.usage?.total_tokens ?? (inputTokens + outputTokens)
+
+  return { answer, inputTokens, outputTokens, totalTokens }
+}
+
+// --- OpenRouter (supports 100+ models: Qwen, Mistral, Llama, Claude, GPT...) ---
+async function callOpenRouter(req: LLMRequest, apiKey: string, model: string, plan?: string): Promise<{
+  answer: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+}> {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://app.stayjoy.io.vn',
+      'X-Title': 'StayJoy Chatbot',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: req.systemMessage },
+        { role: 'user', content: req.userMessage },
+      ],
+      max_tokens: 1024,
+    }),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`OpenRouter ${response.status}: ${text.slice(0, 200)}`)
+  }
+
+  const data = await response.json()
+  const answer = data?.choices?.[0]?.message?.content ?? ''
+  const inputTokens = data?.usage?.prompt_tokens ?? 0
+  const outputTokens = data?.usage?.completion_tokens ?? 0
+  const totalTokens = data?.usage?.total_tokens ?? (inputTokens + outputTokens)
+
+  return { answer, inputTokens, outputTokens, totalTokens }
 }
 
 // --- Provider Registry ---
 
 const DEFAULT_MODELS: Record<string, string> = {
-  gemini: 'gemini-2.0-flash-lite',
+  gemini: 'gemini-2.5-flash-lite',
   openai: 'gpt-4o-mini',
   anthropic: 'claude-3-haiku-20240307',
   groq: 'llama-3.3-70b-versatile',
+  openrouter: 'qwen/qwen-2.5-72b-instruct',
 }
 
 function getProviderConfig(name: string): ProviderConfig | null {
@@ -160,6 +259,8 @@ function getProviderConfig(name: string): ProviderConfig | null {
       return { name: 'anthropic', apiKey: process.env.ANTHROPIC_API_KEY, model, call: callAnthropic }
     case 'groq':
       return { name: 'groq', apiKey: process.env.GROQ_API_KEY, model, call: callGroq }
+    case 'openrouter':
+      return { name: 'openrouter', apiKey: process.env.OPENROUTER_API_KEY, model, call: callOpenRouter }
     default:
       return null
   }
@@ -251,7 +352,7 @@ async function getConfigFromDB(propertyId?: string): Promise<DBConfig | null> {
  * @param req - The LLM request (system + user message)
  * @param propertyId - Optional property ID for per-property LLM config
  */
-export async function callLLM(req: LLMRequest, propertyId?: string): Promise<LLMResponse> {
+export async function callLLM(req: LLMRequest, propertyId?: string, plan?: string): Promise<LLMResponse> {
   // Try DB config first (property-specific → global)
   const dbConfig = await getConfigFromDB(propertyId)
 
@@ -260,8 +361,13 @@ export async function callLLM(req: LLMRequest, propertyId?: string): Promise<LLM
     const callFn = getCallFunction(dbConfig.provider)
     if (callFn) {
       try {
-        const answer = await callFn(req, dbConfig.apiKey, dbConfig.model)
-        return { answer, provider: dbConfig.provider, model: dbConfig.model }
+        const { answer, inputTokens, outputTokens, totalTokens } = await callFn(req, dbConfig.apiKey, dbConfig.model, plan)
+        return {
+          answer,
+          provider: dbConfig.provider,
+          model: dbConfig.model,
+          usage: { inputTokens, outputTokens, totalTokens }
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         console.error(`[LLM] DB primary (${dbConfig.provider}) failed:`, msg)
@@ -272,8 +378,13 @@ export async function callLLM(req: LLMRequest, propertyId?: string): Promise<LLM
           if (fallbackFn) {
             try {
               const fallbackModel = dbConfig.fallbackModel || DEFAULT_MODELS[dbConfig.fallbackProvider] || ''
-              const answer = await fallbackFn(req, dbConfig.fallbackApiKey, fallbackModel)
-              return { answer, provider: dbConfig.fallbackProvider, model: fallbackModel }
+              const { answer, inputTokens, outputTokens, totalTokens } = await fallbackFn(req, dbConfig.fallbackApiKey, fallbackModel, plan)
+              return {
+                answer,
+                provider: dbConfig.fallbackProvider,
+                model: fallbackModel,
+                usage: { inputTokens, outputTokens, totalTokens }
+              }
             } catch (fallbackErr) {
               const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
               console.error(`[LLM] DB fallback (${dbConfig.fallbackProvider}) failed:`, fallbackMsg)
@@ -294,7 +405,7 @@ export async function callLLM(req: LLMRequest, propertyId?: string): Promise<LLM
   if (fallbackName && fallbackName !== primaryName) chain.push(fallbackName)
 
   // Add any other provider that has a key configured
-  const allProviders = ['gemini', 'openai', 'anthropic', 'groq']
+  const allProviders = ['gemini', 'openai', 'anthropic', 'groq', 'openrouter']
   for (const p of allProviders) {
     if (!chain.includes(p)) chain.push(p)
   }
@@ -306,8 +417,13 @@ export async function callLLM(req: LLMRequest, propertyId?: string): Promise<LLM
     if (!config || !config.apiKey) continue
 
     try {
-      const answer = await config.call(req, config.apiKey, config.model)
-      return { answer, provider: config.name, model: config.model }
+      const { answer, inputTokens, outputTokens, totalTokens } = await config.call(req, config.apiKey, config.model, plan)
+      return {
+        answer,
+        provider: config.name,
+        model: config.model,
+        usage: { inputTokens, outputTokens, totalTokens }
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       errors.push(`${providerName}: ${msg}`)
@@ -321,12 +437,13 @@ export async function callLLM(req: LLMRequest, propertyId?: string): Promise<LLM
 }
 
 // Helper to get the call function by provider name
-function getCallFunction(provider: string): ((req: LLMRequest, apiKey: string, model: string) => Promise<string>) | null {
+function getCallFunction(provider: string): CallFunction | null {
   switch (provider) {
     case 'gemini': return callGemini
     case 'openai': return callOpenAI
     case 'anthropic': return callAnthropic
     case 'groq': return callGroq
+    case 'openrouter': return callOpenRouter
     default: return null
   }
 }

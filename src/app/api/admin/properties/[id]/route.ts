@@ -16,7 +16,7 @@ async function getAdminUser(supabase: ReturnType<typeof createClient>) {
   return session.user
 }
 
-// PATCH /api/admin/subscriptions/:id — update plan/status
+// PATCH /api/admin/properties/:id — update property name, address, hotline, plan, expires_at
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -28,17 +28,25 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  let body: { plan?: unknown; status?: unknown; expires_at?: unknown }
+  let body: {
+    name?: unknown
+    address?: unknown
+    hotline?: unknown
+    plan?: unknown
+    expires_at?: unknown
+  }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const updates: Record<string, string> = {}
-  if (body.plan !== undefined) updates.plan = String(body.plan)
-  if (body.status !== undefined) updates.status = String(body.status)
-  if (body.expires_at !== undefined) updates.expires_at = String(body.expires_at)
+  const updates: Record<string, any> = {}
+  if (body.name !== undefined) updates.name = String(body.name)
+  if (body.address !== undefined) updates.address = body.address ? String(body.address) : null
+  if (body.hotline !== undefined) updates.hotline = body.hotline ? String(body.hotline) : null
+  if (body.plan !== undefined) updates.plan = String(body.plan).toLowerCase()
+  if (body.expires_at !== undefined) updates.expires_at = body.expires_at ? String(body.expires_at) : null
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -46,20 +54,20 @@ export async function PATCH(
 
   try {
     const { data, error } = await supabase
-      .from('subscriptions')
+      .from('properties')
       .update(updates)
       .eq('id', params.id)
-      .select('id, plan, status, expires_at, trial_ends_at, property_id')
+      .select('id, name, address, hotline, plan, expires_at')
       .single()
 
     if (error) throw error
     if (!data) {
-      return NextResponse.json({ error: 'Subscription not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Property not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ subscription: data })
+    return NextResponse.json({ property: data })
   } catch (error) {
-    console.error('[PATCH /api/admin/subscriptions/:id]', error)
+    console.error('[PATCH /api/admin/properties/:id]', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

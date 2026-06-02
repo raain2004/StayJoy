@@ -3,9 +3,8 @@ export type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'cancelled'
 export type ExpiryAlertLevel = 'warning' | 'urgent' | 'critical'
 
 export interface SubscriptionInfo {
-  status: SubscriptionStatus
+  plan: string
   expires_at: string | null
-  trial_ends_at: string | null
 }
 
 export interface ExpiryState {
@@ -19,8 +18,7 @@ export function computeDaysUntilExpiry(
   subscription: SubscriptionInfo,
   now: Date = new Date()
 ): number | null {
-  const isTrial = subscription.status === 'trial'
-  const expiryDate = isTrial ? subscription.trial_ends_at : subscription.expires_at
+  const expiryDate = subscription.expires_at
 
   if (!expiryDate) return null
 
@@ -36,7 +34,7 @@ export function getExpiryState(
   subscription: SubscriptionInfo | null,
   now: Date = new Date()
 ): ExpiryState {
-  if (!subscription || subscription.status === 'cancelled') {
+  if (!subscription) {
     return { shouldShow: false, daysLeft: null, level: null, isTrial: false }
   }
 
@@ -59,6 +57,7 @@ export function getExpiryState(
     shouldShow: true,
     daysLeft,
     level,
-    isTrial: subscription.status === 'trial',
+    isTrial: subscription.plan?.toLowerCase() === 'trial',
   }
 }
+

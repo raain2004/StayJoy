@@ -8,7 +8,6 @@ import { QuotaCard } from '@/components/dashboard/QuotaCard'
 interface DashboardSummary {
   totalBookingsThisMonth: number
   totalConversationsThisMonth: number
-  pendingServiceRequests: number
   vacancyRate: number
 }
 
@@ -56,10 +55,9 @@ export default function DashboardPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {loading ? (
             <>
-              <KPICardSkeleton />
               <KPICardSkeleton />
               <KPICardSkeleton />
               <KPICardSkeleton />
@@ -75,11 +73,6 @@ export default function DashboardPage() {
                 title="Tổng Trò Chuyện Tháng"
                 value={data.totalConversationsThisMonth}
                 subtitle="Tháng hiện tại"
-              />
-              <KPICard
-                title="Yêu Cầu Dịch Vụ Chờ"
-                value={data.pendingServiceRequests}
-                subtitle="Mới & Đang xử lý"
               />
               <KPICard
                 title="Tỷ Lệ Phòng Trống"

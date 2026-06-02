@@ -23,13 +23,10 @@ export default async function AdminOverviewPage() {
 
   if (userProp?.role !== 'admin') redirect('/dashboard')
 
-  // Fetch all properties with subscriptions
+  // Fetch all properties
   const { data: properties } = await supabase
     .from('properties')
-    .select(`
-      id, name, address, hotline,
-      subscriptions (id, plan, status, trial_ends_at, expires_at, started_at)
-    `)
+    .select('id, name, address, hotline, plan, expires_at, created_at')
     .order('name')
 
   const allProps = properties ?? []
@@ -38,17 +35,17 @@ export default async function AdminOverviewPage() {
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-  let active = 0, trial = 0, expired = 0, cancelled = 0, newThisMonth = 0
+  let active = 0, trial = 0, expired = 0, newThisMonth = 0
 
   allProps.forEach((p) => {
-    const subs = p.subscriptions as { status: string; started_at: string | null }[]
-    const sub = subs?.[0]
-    if (!sub) return
-    if (sub.status === 'active') active++
-    else if (sub.status === 'trial') trial++
-    else if (sub.status === 'expired') expired++
-    else if (sub.status === 'cancelled') cancelled++
-    if (sub.started_at && new Date(sub.started_at) >= startOfMonth) newThisMonth++
+    const isExpired = p.expires_at ? new Date(p.expires_at) < now : false
+    const plan = p.plan?.toLowerCase() || 'trial'
+    
+    if (isExpired) expired++
+    else if (plan === 'trial') trial++
+    else active++
+    
+    if (p.created_at && new Date(p.created_at) >= startOfMonth) newThisMonth++
   })
 
   return (
@@ -76,14 +73,10 @@ export default async function AdminOverviewPage() {
       </div>
 
       {/* Secondary stats */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Expired</p>
+          <p className="text-sm text-muted-foreground">Expired (Hết Hạn)</p>
           <p className="text-2xl font-bold text-red-500">{expired}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Cancelled</p>
-          <p className="text-2xl font-bold text-gray-400">{cancelled}</p>
         </div>
       </div>
 
@@ -102,35 +95,25 @@ export default async function AdminOverviewPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {allProps.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    Chưa có property nào
-                  </TableCell>
-                </TableRow>
-              ) : (
-                allProps.map((p) => {
-                  const subs = p.subscriptions as { plan: string; status: string; trial_ends_at: string | null; expires_at: string | null }[]
-                  const sub = subs?.[0]
-                  return (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.name}</TableCell>
-                      <TableCell>{p.hotline ?? '—'}</TableCell>
-                      <TableCell>{sub?.plan ?? '—'}</TableCell>
-                      <TableCell>
-                        {sub ? <SubscriptionBadge status={sub.status} /> : '—'}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {sub?.expires_at
-                          ? new Date(sub.expires_at).toLocaleDateString('vi-VN')
-                          : sub?.trial_ends_at
-                          ? `Trial đến ${new Date(sub.trial_ends_at).toLocaleDateString('vi-VN')}`
-                          : '—'}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
+              {allProps.map((p) => {
+                const isExpired = p.expires_at ? new Date(p.expires_at) < now : false
+                const status = isExpired ? 'expired' : (p.plan?.toLowerCase() === 'trial' ? 'trial' : 'active')
+                return (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell>{p.hotline ?? '—'}</TableCell>
+                    <TableCell>{p.plan?.toUpperCase() ?? 'TRIAL'}</TableCell>
+                    <TableCell>
+                      <SubscriptionBadge status={status} />
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {p.expires_at
+                        ? new Date(p.expires_at).toLocaleDateString('vi-VN')
+                        : '—'}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </div>

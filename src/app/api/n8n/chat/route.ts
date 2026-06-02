@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Chờ debounce hoàn tất (3s sau tin nhắn cuối cùng)
+    // Chờ debounce hoàn tất (30s sau tin nhắn cuối cùng)
     const combinedMessage = await debouncedMessage
 
     const supabase = createServiceClient()
@@ -127,14 +127,19 @@ export async function POST(request: NextRequest) {
 
       const roomsWithImages = Object.keys(imagesByRoom)
       const imageInstruction = [
-        '\n\n---\n\n## Hướng Dẫn Gửi Hình Phòng',
+        '\n\n---\n\n## HƯỚNG DẪN GỬI HÌNH PHÒNG (BẮT BUỘC)',
         '',
-        'Khi khách hỏi xem hình phòng, hãy trả lời bình thường và thêm tag [SHOW_IMAGES:room_id] vào cuối câu trả lời.',
-        `Các phòng có hình: ${roomsWithImages.join(', ')}`,
+        'Khi khách hàng hỏi xem hình ảnh, ảnh chụp hoặc muốn nhìn phòng, bạn BẮT BUỘC phải trả lời bình thường và thêm chính xác tag [SHOW_IMAGES:room_id] vào cuối câu trả lời.',
+        'Hệ thống sẽ tự động chuyển đổi tag này thành ảnh thực tế gửi cho khách.',
+        `Danh sách phòng có ảnh: ${roomsWithImages.join(', ')}`,
         '',
-        'Ví dụ: "Đây là phòng đôi của chúng tôi, rất thoáng mát ạ. [SHOW_IMAGES:P101]"',
-        'Nếu khách hỏi xem tất cả phòng, gửi nhiều tag: [SHOW_IMAGES:P101] [SHOW_IMAGES:P102]',
-        'Chỉ dùng tag cho phòng có trong danh sách trên.',
+        'BẢN ĐỒ MAPPING PHÒNG (Hãy đối chiếu kỹ):',
+        ...rooms.filter(r => roomsWithImages.includes(r.room_id)).map(r => `  - Phòng ID "${r.room_id}" hoặc loại phòng "${r.loai_phong}" -> Dùng tag: [SHOW_IMAGES:${r.room_id}]`),
+        '',
+        'LƯU Ý CÚ PHÁP:',
+        '- Ví dụ: "Dạ, em gửi anh/chị xem ảnh của phòng Superior Giường Đôi (P101) ạ! [SHOW_IMAGES:P101]"',
+        '- Nếu khách muốn xem hình tất cả các phòng hoặc nhiều phòng cùng lúc, hãy đính kèm nhiều tag: [SHOW_IMAGES:P101] [SHOW_IMAGES:P102]',
+        '- Không sử dụng tag cho những phòng không có trong danh sách trên.',
       ].join('\n')
 
       systemMessage += imageInstruction

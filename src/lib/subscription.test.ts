@@ -6,18 +6,10 @@ import {
   SubscriptionInfo,
 } from './subscription'
 
-// ─── Unit Tests ───────────────────────────────────────────────────────────────
-
 describe('computeDaysUntilExpiry', () => {
-  it('returns null when expires_at is null (active)', () => {
+  it('returns null when expires_at is null', () => {
     expect(
-      computeDaysUntilExpiry({ status: 'active', expires_at: null, trial_ends_at: null })
-    ).toBeNull()
-  })
-
-  it('returns null when trial_ends_at is null (trial)', () => {
-    expect(
-      computeDaysUntilExpiry({ status: 'trial', expires_at: '2030-01-01', trial_ends_at: null })
+      computeDaysUntilExpiry({ plan: 'pro', expires_at: null })
     ).toBeNull()
   })
 
@@ -25,7 +17,7 @@ describe('computeDaysUntilExpiry', () => {
     const now = new Date('2024-01-01T00:00:00Z')
     const expiryDate = new Date('2024-01-08T00:00:00Z') // 7 days later
     const result = computeDaysUntilExpiry(
-      { status: 'active', expires_at: expiryDate.toISOString(), trial_ends_at: null },
+      { plan: 'pro', expires_at: expiryDate.toISOString() },
       now
     )
     expect(result).toBe(7)
@@ -35,29 +27,18 @@ describe('computeDaysUntilExpiry', () => {
     const now = new Date('2024-01-10T00:00:00Z')
     const expiryDate = new Date('2024-01-09T00:00:00Z')
     const result = computeDaysUntilExpiry(
-      { status: 'active', expires_at: expiryDate.toISOString(), trial_ends_at: null },
+      { plan: 'pro', expires_at: expiryDate.toISOString() },
       now
     )
     expect(result).not.toBeNull()
     expect(result!).toBeLessThanOrEqual(0)
   })
 
-  it('uses trial_ends_at for trial subscriptions, not expires_at', () => {
-    const now = new Date('2024-01-01T00:00:00Z')
-    const trialEnd = new Date('2024-01-04T00:00:00Z') // 3 days
-    const expiresAt = new Date('2024-01-31T00:00:00Z') // 30 days
-    const result = computeDaysUntilExpiry(
-      { status: 'trial', expires_at: expiresAt.toISOString(), trial_ends_at: trialEnd.toISOString() },
-      now
-    )
-    expect(result).toBe(3)
-  })
-
   it('uses ceil for partial days', () => {
     const now = new Date('2024-01-01T12:00:00Z') // noon
     const expiryDate = new Date('2024-01-02T00:00:00Z') // midnight next day = 0.5 days
     const result = computeDaysUntilExpiry(
-      { status: 'active', expires_at: expiryDate.toISOString(), trial_ends_at: null },
+      { plan: 'pro', expires_at: expiryDate.toISOString() },
       now
     )
     expect(result).toBe(1) // ceil(0.5) = 1
@@ -72,18 +53,11 @@ describe('getExpiryState', () => {
     expect(state.level).toBeNull()
   })
 
-  it('returns shouldShow=false for cancelled subscription', () => {
-    const sub: SubscriptionInfo = { status: 'cancelled', expires_at: '2024-01-10', trial_ends_at: null }
-    const state = getExpiryState(sub)
-    expect(state.shouldShow).toBe(false)
-  })
-
   it('returns shouldShow=false when daysLeft > 7', () => {
     const now = new Date('2024-01-01T00:00:00Z')
     const sub: SubscriptionInfo = {
-      status: 'active',
+      plan: 'pro',
       expires_at: new Date('2024-01-10T00:00:00Z').toISOString(), // 9 days
-      trial_ends_at: null,
     }
     const state = getExpiryState(sub, now)
     expect(state.shouldShow).toBe(false)
@@ -92,9 +66,8 @@ describe('getExpiryState', () => {
   it('returns warning level for daysLeft = 7', () => {
     const now = new Date('2024-01-01T00:00:00Z')
     const sub: SubscriptionInfo = {
-      status: 'active',
+      plan: 'pro',
       expires_at: new Date('2024-01-08T00:00:00Z').toISOString(),
-      trial_ends_at: null,
     }
     const state = getExpiryState(sub, now)
     expect(state.shouldShow).toBe(true)
@@ -105,9 +78,8 @@ describe('getExpiryState', () => {
   it('returns warning level for daysLeft = 4', () => {
     const now = new Date('2024-01-01T00:00:00Z')
     const sub: SubscriptionInfo = {
-      status: 'active',
+      plan: 'pro',
       expires_at: new Date('2024-01-05T00:00:00Z').toISOString(),
-      trial_ends_at: null,
     }
     const state = getExpiryState(sub, now)
     expect(state.level).toBe('warning')
@@ -116,9 +88,8 @@ describe('getExpiryState', () => {
   it('returns urgent level for daysLeft = 3', () => {
     const now = new Date('2024-01-01T00:00:00Z')
     const sub: SubscriptionInfo = {
-      status: 'active',
+      plan: 'pro',
       expires_at: new Date('2024-01-04T00:00:00Z').toISOString(),
-      trial_ends_at: null,
     }
     const state = getExpiryState(sub, now)
     expect(state.level).toBe('urgent')
@@ -127,9 +98,8 @@ describe('getExpiryState', () => {
   it('returns urgent level for daysLeft = 2', () => {
     const now = new Date('2024-01-01T00:00:00Z')
     const sub: SubscriptionInfo = {
-      status: 'active',
+      plan: 'pro',
       expires_at: new Date('2024-01-03T00:00:00Z').toISOString(),
-      trial_ends_at: null,
     }
     const state = getExpiryState(sub, now)
     expect(state.level).toBe('urgent')
@@ -138,20 +108,18 @@ describe('getExpiryState', () => {
   it('returns critical level for daysLeft = 1', () => {
     const now = new Date('2024-01-01T00:00:00Z')
     const sub: SubscriptionInfo = {
-      status: 'active',
+      plan: 'pro',
       expires_at: new Date('2024-01-02T00:00:00Z').toISOString(),
-      trial_ends_at: null,
     }
     const state = getExpiryState(sub, now)
     expect(state.level).toBe('critical')
   })
 
-  it('sets isTrial=true for trial subscriptions', () => {
+  it('sets isTrial=true for trial plan', () => {
     const now = new Date('2024-01-01T00:00:00Z')
     const sub: SubscriptionInfo = {
-      status: 'trial',
-      expires_at: null,
-      trial_ends_at: new Date('2024-01-04T00:00:00Z').toISOString(),
+      plan: 'trial',
+      expires_at: new Date('2024-01-04T00:00:00Z').toISOString(),
     }
     const state = getExpiryState(sub, now)
     expect(state.isTrial).toBe(true)
@@ -162,9 +130,6 @@ describe('getExpiryState', () => {
 // ─── Property-Based Tests ─────────────────────────────────────────────────────
 
 describe('Property 1: computeDaysUntilExpiry formula', () => {
-  /**
-   * Validates: Requirements 4.1, 4.2, 4.3
-   */
   it('result equals Math.ceil((expiryDate - now) / 86_400_000) for any valid dates', () => {
     fc.assert(
       fc.property(
@@ -172,9 +137,8 @@ describe('Property 1: computeDaysUntilExpiry formula', () => {
         fc.date({ min: new Date('2020-01-01'), max: new Date('2030-01-01') }),
         (expiryDate, now) => {
           const sub: SubscriptionInfo = {
-            status: 'active',
+            plan: 'pro',
             expires_at: expiryDate.toISOString(),
-            trial_ends_at: null,
           }
           const result = computeDaysUntilExpiry(sub, now)
           const expected = Math.ceil((expiryDate.getTime() - now.getTime()) / 86_400_000)
@@ -190,7 +154,7 @@ describe('Property 1: computeDaysUntilExpiry formula', () => {
       fc.property(
         fc.date(),
         (now) => {
-          const sub: SubscriptionInfo = { status: 'active', expires_at: null, trial_ends_at: null }
+          const sub: SubscriptionInfo = { plan: 'pro', expires_at: null }
           return computeDaysUntilExpiry(sub, now) === null
         }
       ),
@@ -205,9 +169,8 @@ describe('Property 1: computeDaysUntilExpiry formula', () => {
         (expiryDate) => {
           const now = new Date(expiryDate.getTime() + 86_400_000) // 1 day after expiry
           const sub: SubscriptionInfo = {
-            status: 'active',
+            plan: 'pro',
             expires_at: expiryDate.toISOString(),
-            trial_ends_at: null,
           }
           const result = computeDaysUntilExpiry(sub, now)
           return result !== null && result <= 0
@@ -218,36 +181,7 @@ describe('Property 1: computeDaysUntilExpiry formula', () => {
   })
 })
 
-describe('Property 2: trial subscription uses trial_ends_at', () => {
-  /**
-   * Validates: Requirements 4.4
-   */
-  it('uses trial_ends_at (not expires_at) for trial subscriptions', () => {
-    fc.assert(
-      fc.property(
-        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-01-01') }),
-        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-01-01') }),
-        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-01-01') }),
-        (trialEndsAt, expiresAt, now) => {
-          const sub: SubscriptionInfo = {
-            status: 'trial',
-            expires_at: expiresAt.toISOString(),
-            trial_ends_at: trialEndsAt.toISOString(),
-          }
-          const result = computeDaysUntilExpiry(sub, now)
-          const expected = Math.ceil((trialEndsAt.getTime() - now.getTime()) / 86_400_000)
-          return result === expected
-        }
-      ),
-      { numRuns: 100 }
-    )
-  })
-})
-
-describe('Property 3: monotonicity of Days_Until_Expiry', () => {
-  /**
-   * Validates: Requirements 4.5
-   */
+describe('Property 2: monotonicity of Days_Until_Expiry', () => {
   it('result never increases as time moves forward', () => {
     fc.assert(
       fc.property(
@@ -257,9 +191,8 @@ describe('Property 3: monotonicity of Days_Until_Expiry', () => {
           const t1 = new Date('2024-06-01T00:00:00Z')
           const t2 = new Date(t1.getTime() + offsetMs)
           const sub: SubscriptionInfo = {
-            status: 'active',
+            plan: 'pro',
             expires_at: expiryDate.toISOString(),
-            trial_ends_at: null,
           }
           const r1 = computeDaysUntilExpiry(sub, t1)
           const r2 = computeDaysUntilExpiry(sub, t2)
@@ -271,10 +204,7 @@ describe('Property 3: monotonicity of Days_Until_Expiry', () => {
   })
 })
 
-describe('Property 4: severity level mapping', () => {
-  /**
-   * Validates: Requirements 3.2, 3.3, 3.4
-   */
+describe('Property 3: severity level mapping', () => {
   it('maps daysLeft in [1,7] to correct severity level', () => {
     fc.assert(
       fc.property(
@@ -283,9 +213,8 @@ describe('Property 4: severity level mapping', () => {
           const now = new Date('2024-01-01T00:00:00Z')
           const expiryDate = new Date(now.getTime() + daysLeft * 86_400_000)
           const sub: SubscriptionInfo = {
-            status: 'active',
+            plan: 'pro',
             expires_at: expiryDate.toISOString(),
-            trial_ends_at: null,
           }
           const state = getExpiryState(sub, now)
           if (daysLeft >= 4) return state.level === 'warning'
@@ -298,10 +227,7 @@ describe('Property 4: severity level mapping', () => {
   })
 })
 
-describe('Property 5: banner visibility and daysLeft accuracy', () => {
-  /**
-   * Validates: Requirements 3.1, 3.5, 3.7
-   */
+describe('Property 4: banner visibility and daysLeft accuracy', () => {
   it('shows correct daysLeft and isTrial flag for subscriptions in threshold', () => {
     fc.assert(
       fc.property(
@@ -310,9 +236,10 @@ describe('Property 5: banner visibility and daysLeft accuracy', () => {
         (daysLeft, isTrial) => {
           const now = new Date('2024-01-01T00:00:00Z')
           const expiryDate = new Date(now.getTime() + daysLeft * 86_400_000)
-          const sub: SubscriptionInfo = isTrial
-            ? { status: 'trial', expires_at: null, trial_ends_at: expiryDate.toISOString() }
-            : { status: 'active', expires_at: expiryDate.toISOString(), trial_ends_at: null }
+          const sub: SubscriptionInfo = {
+            plan: isTrial ? 'trial' : 'pro',
+            expires_at: expiryDate.toISOString(),
+          }
           const state = getExpiryState(sub, now)
           return (
             state.shouldShow === true &&
@@ -326,27 +253,7 @@ describe('Property 5: banner visibility and daysLeft accuracy', () => {
   })
 })
 
-describe('Property 6: banner hidden when not needed', () => {
-  /**
-   * Validates: Requirements 3.8, 3.9
-   */
-  it('shouldShow=false for cancelled subscriptions', () => {
-    fc.assert(
-      fc.property(
-        fc.option(fc.date().map((d) => d.toISOString()), { nil: null }),
-        (expiresAt) => {
-          const sub: SubscriptionInfo = {
-            status: 'cancelled',
-            expires_at: expiresAt,
-            trial_ends_at: null,
-          }
-          return getExpiryState(sub).shouldShow === false
-        }
-      ),
-      { numRuns: 100 }
-    )
-  })
-
+describe('Property 5: banner hidden when not needed', () => {
   it('shouldShow=false when daysLeft > 7', () => {
     fc.assert(
       fc.property(
@@ -355,9 +262,8 @@ describe('Property 6: banner hidden when not needed', () => {
           const now = new Date('2024-01-01T00:00:00Z')
           const expiryDate = new Date(now.getTime() + daysLeft * 86_400_000)
           const sub: SubscriptionInfo = {
-            status: 'active',
+            plan: 'pro',
             expires_at: expiryDate.toISOString(),
-            trial_ends_at: null,
           }
           return getExpiryState(sub, now).shouldShow === false
         }

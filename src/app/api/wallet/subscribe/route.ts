@@ -66,36 +66,33 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // 4. Query current active subscription
-    const { data: currentSub } = await supabase
-      .from('subscriptions')
-      .select('id, plan, expires_at, status')
-      .eq('property_id', propertyId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    // 4. Query current active subscription details from properties
+    const { data: property } = await supabase
+      .from('properties')
+      .select('plan, expires_at')
+      .eq('id', propertyId)
+      .single()
 
     const now = new Date()
     let newExpiresAt = new Date()
     let isUpgrade = false
 
-    if (currentSub) {
-      const currentExpiresAt = currentSub.expires_at ? new Date(currentSub.expires_at) : null
+    if (property) {
+      const currentExpiresAt = property.expires_at ? new Date(property.expires_at) : null
       const isExpired = currentExpiresAt ? currentExpiresAt < now : true
 
-      if (!isExpired && currentSub.plan.toLowerCase() === requestedPlan) {
+      if (!isExpired && property.plan.toLowerCase() === requestedPlan) {
         // Extend existing subscription expiration date
         newExpiresAt = new Date(currentExpiresAt!.getTime())
         newExpiresAt.setMonth(newExpiresAt.getMonth() + durationMonths)
       } else {
         // Upgrading plan or renewing an expired subscription (starts from NOW)
         newExpiresAt.setMonth(newExpiresAt.getMonth() + durationMonths)
-        if (!isExpired && currentSub.plan.toLowerCase() !== requestedPlan) {
+        if (!isExpired && property.plan.toLowerCase() !== requestedPlan) {
           isUpgrade = true
         }
       }
     } else {
-      // First time subscription
       newExpiresAt.setMonth(newExpiresAt.getMonth() + durationMonths)
     }
 
@@ -132,38 +129,18 @@ export async function POST(request: NextRequest) {
       console.error('[POST /api/wallet/subscribe] Failed to write spending log:', txError)
     }
 
-    // 7. Update/Create subscription record in database
-    if (currentSub) {
-      const { error: subUpdateError } = await supabase
-        .from('subscriptions')
-        .update({
-          plan: requestedPlan,
-          status: 'active',
-          started_at: now.toISOString(),
-          expires_at: newExpiresAt.toISOString(),
-          updated_at: now.toISOString()
-        })
-        .eq('id', currentSub.id)
+    // 7. Update plan and expires_at directly in properties table
+    const { error: propertyUpdateError } = await supabase
+      .from('properties')
+      .update({
+        plan: requestedPlan,
+        expires_at: newExpiresAt.toISOString()
+      })
+      .eq('id', propertyId)
 
-      if (subUpdateError) {
-        console.error('[POST /api/wallet/subscribe] Failed to update subscription:', subUpdateError)
-        return NextResponse.json({ error: 'Cập nhật gói cước thất bại' }, { status: 500 })
-      }
-    } else {
-      const { error: subInsertError } = await supabase
-        .from('subscriptions')
-        .insert({
-          property_id: propertyId,
-          plan: requestedPlan,
-          status: 'active',
-          started_at: now.toISOString(),
-          expires_at: newExpiresAt.toISOString()
-        })
-
-      if (subInsertError) {
-        console.error('[POST /api/wallet/subscribe] Failed to insert subscription:', subInsertError)
-        return NextResponse.json({ error: 'Đăng ký gói cước thất bại' }, { status: 500 })
-      }
+    if (propertyUpdateError) {
+      console.error('[POST /api/wallet/subscribe] Failed to update property plan:', propertyUpdateError)
+      return NextResponse.json({ error: 'Cập nhật gói cước thất bại' }, { status: 500 })
     }
 
     return NextResponse.json({

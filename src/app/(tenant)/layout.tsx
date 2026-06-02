@@ -22,13 +22,13 @@ export default async function TenantLayout({
         .single()
 
       if (userProperty) {
-        const { data: subscription } = await supabase
-          .from('subscriptions')
-          .select('status, expires_at, trial_ends_at')
-          .eq('property_id', userProperty.property_id)
+        const { data: property } = await supabase
+          .from('properties')
+          .select('plan, expires_at')
+          .eq('id', userProperty.property_id)
           .single()
 
-        expiryState = getExpiryState(subscription)
+        expiryState = getExpiryState(property)
       }
     }
   } catch {

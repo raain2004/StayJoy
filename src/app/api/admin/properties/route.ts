@@ -28,20 +28,7 @@ export async function GET() {
   try {
     const { data, error } = await supabase
       .from('properties')
-      .select(`
-        id,
-        name,
-        address,
-        hotline,
-        subscriptions (
-          id,
-          plan,
-          status,
-          started_at,
-          expires_at,
-          trial_ends_at
-        )
-      `)
+      .select('id, name, address, hotline, plan, expires_at')
       .order('name')
 
     if (error) throw error

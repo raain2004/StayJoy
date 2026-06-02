@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bot, Cpu, CreditCard, LogOut, TableOfContents, CalendarCheck2, ClipboardList, ClipboardCheck, Building, MessageCircle, Wallet2, PieChart, type LucideIcon } from 'lucide-react'
+import { Bot, Cpu, CreditCard, LogOut, TableOfContents, CalendarCheck2, ClipboardList, Building, MessageCircle, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
@@ -10,7 +10,6 @@ const navItems: { href: string; label: string; icon?: LucideIcon }[] = [
   { href: '/dashboard', label: 'Tổng Quan', icon: TableOfContents },
   { href: '/dashboard/calendar', label: 'Lịch Phòng', icon: CalendarCheck2 },
   { href: '/dashboard/bookings', label: 'Yêu Cầu Đặt Phòng', icon: ClipboardList },
-  { href: '/dashboard/services', label: 'Yêu Cầu Dịch Vụ', icon: ClipboardCheck },
   { href: '/dashboard/rooms', label: 'Quản Lý Phòng', icon: Building },
   { href: '/dashboard/conversations', label: 'Hội Thoại', icon: MessageCircle },
   { href: '/dashboard/ai-chatbot', label: 'AI Chatbot', icon: Bot },

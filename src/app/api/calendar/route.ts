@@ -31,7 +31,37 @@ export async function GET(request: NextRequest) {
 
     if (bookingsError) throw bookingsError
 
-    return NextResponse.json({ rooms: rooms ?? [], bookings: bookings ?? [] })
+    // Fetch ical bookings
+    const { data: icalBookings, error: icalError } = await supabase
+      .from('ical_bookings')
+      .select('*')
+      .lte('check_in', lastDay)
+      .gte('check_out', firstDay)
+
+    if (icalError) throw icalError
+
+    // Map ical_bookings to match the Booking structure expected by the client calendar
+    const mappedIcalBookings = (icalBookings ?? []).map((ib) => ({
+      id: ib.id,
+      property_id: ib.property_id,
+      so_phong: ib.room_id,
+      loai_phong: 'ical',
+      ho_ten: `[${ib.source_name}] ${ib.summary || 'Đã khóa lịch'}`,
+      sdt: '',
+      email: '',
+      check_in: ib.check_in,
+      check_out: ib.check_out,
+      num_day: 0,
+      tinh_trang: 'confirmed', // Treat as confirmed so it matches ACTIVE_STATUSES
+      timestamp: ib.synced_at,
+    }))
+
+    const combinedBookings = [
+      ...(bookings ?? []),
+      ...mappedIcalBookings,
+    ]
+
+    return NextResponse.json({ rooms: rooms ?? [], bookings: combinedBookings })
   } catch (error) {
     console.error('[GET /api/calendar]', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

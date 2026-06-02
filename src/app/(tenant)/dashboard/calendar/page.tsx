@@ -3,21 +3,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { BookingCalendar } from '@/components/dashboard/BookingCalendar'
+import { type Booking } from '@/lib/calendar'
 
 interface Room {
   room_id: string
   loai_phong: string
   suc_chua: number
   gia_dem: number
-}
-
-interface Booking {
-  booking_id: string
-  so_phong: string
-  ho_ten: string
-  check_in: string
-  check_out: string
-  tinh_trang: string
 }
 
 interface CalendarData {

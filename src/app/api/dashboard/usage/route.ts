@@ -28,14 +28,12 @@ export async function GET() {
     const now = new Date()
     const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
-    const [subscriptionRes, usageRes] = await Promise.all([
+    const [propertyRes, usageRes] = await Promise.all([
       supabase
-        .from('subscriptions')
-        .select('plan, status')
-        .eq('property_id', propertyId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .from('properties')
+        .select('plan, expires_at')
+        .eq('id', propertyId)
+        .single(),
       supabase
         .from('monthly_usages')
         .select('message_count')
@@ -44,8 +42,9 @@ export async function GET() {
         .maybeSingle()
     ])
 
-    const plan = subscriptionRes.data?.plan?.toLowerCase() || 'trial'
-    const planStatus = subscriptionRes.data?.status || 'active'
+    const plan = propertyRes.data?.plan?.toLowerCase() || 'trial'
+    const isExpired = propertyRes.data?.expires_at ? new Date(propertyRes.data.expires_at) < now : false
+    const planStatus = isExpired ? 'expired' : 'active'
     const messageCount = usageRes.data?.message_count || 0
 
     const planLimits: Record<string, number> = {

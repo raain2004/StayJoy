@@ -64,7 +64,8 @@ export async function POST(request: NextRequest) {
   let newUserId: string | null = null
 
   try {
-    // Step 1: Create property
+    // Step 1: Create property (with default trial plan, 14 days expiry)
+    const trialExpiry = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
     const { data: property, error: propError } = await serviceClient
       .from('properties')
       .insert({
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
         address: address ? String(address) : null,
         hotline: hotline ? String(hotline) : null,
         description: description ? String(description) : null,
+        plan: 'trial',
+        expires_at: trialExpiry
       })
       .select('id')
       .single()
@@ -80,21 +83,6 @@ export async function POST(request: NextRequest) {
       throw new Error(`Failed to create property: ${propError?.message}`)
     }
     propertyId = property.id
-
-    // Step 2: Create subscription (trial, 14 days)
-    const { error: subError } = await serviceClient
-      .from('subscriptions')
-      .insert({
-        property_id: propertyId,
-        plan: 'trial',
-        status: 'trial',
-        started_at: new Date().toISOString(),
-        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      })
-
-    if (subError) {
-      throw new Error(`Failed to create subscription: ${subError.message}`)
-    }
 
     // Step 3: Create chatwoot_inbox_mapping (if inbox_id provided)
     if (inbox_id) {

@@ -248,7 +248,10 @@ ${upsellSection}
   1. Ngày check-in / check-out
   2. Số người (gợi ý phòng phù hợp)
   3. Họ tên + SĐT
-- Sau khi đủ: "Dạ em đã ghi nhận. Chủ nhà sẽ liên hệ anh/chị sớm nhất để xác nhận ạ!"
+- Sau khi có ĐỦ ít nhất: tên + SĐT + ngày check-in, trả lời khách bình thường VÀ thêm tag ẩn ở cuối:
+  [BOOKING_REQUEST|ten=Họ tên|sdt=SĐT|checkin=YYYY-MM-DD|checkout=YYYY-MM-DD|phong=Loại phòng|songuoi=Số]
+  Ví dụ: "Dạ em đã ghi nhận ạ! Chủ nhà sẽ liên hệ sớm nhất [BOOKING_REQUEST|ten=Nguyen Van A|sdt=0909123456|checkin=2026-06-15|checkout=2026-06-17|phong=Phong Doi|songuoi=2]"
+  Nếu thiếu thông tin → hỏi thêm, KHÔNG thêm tag.
 
 ### KHI KHÁCH YÊU CẦU DỊCH VỤ (đang ở homestay)
 - Hỏi: số phòng + yêu cầu cụ thể

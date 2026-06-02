@@ -81,20 +81,19 @@ export async function middleware(request: NextRequest) {
       pathname !== '/dashboard/settings' &&
       !pathname.startsWith('/subscription-expired')
     ) {
-      const { data: subscription } = await supabase
-        .from('subscriptions')
-        .select('status, expires_at')
-        .eq('property_id', userProperty.property_id)
+      const { data: property } = await supabase
+        .from('properties')
+        .select('plan, expires_at')
+        .eq('id', userProperty.property_id)
         .limit(1)
         .single()
 
-      if (subscription) {
-        const isExpiredStatus = subscription.status === 'expired'
+      if (property) {
         const isExpiredByDate =
-          subscription.expires_at !== null &&
-          new Date(subscription.expires_at) < new Date()
+          property.expires_at !== null &&
+          new Date(property.expires_at) < new Date()
 
-        if (isExpiredStatus || isExpiredByDate) {
+        if (isExpiredByDate) {
           const expiredUrl = request.nextUrl.clone()
           expiredUrl.pathname = '/subscription-expired'
           return NextResponse.redirect(expiredUrl)
@@ -120,6 +119,6 @@ export const config = {
      * - /_next/* (Next.js internals)
      * - /favicon.ico, static files
      */
-    '/((?!login|auth|onboarding|subscription-expired|privacy|terms|api/chatwoot|api/wallet/payos-webhook|api/knowledge-base|api/n8n|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!login|auth|onboarding|subscription-expired|privacy|terms|api/chatwoot|api/wallet/payos-webhook|api/knowledge-base|api/n8n|api/cron|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

@@ -27,29 +27,25 @@ export async function GET() {
 
   try {
     // 1. Fetch properties and their subscription details
-    const [propertiesRes, subscriptionsRes] = await Promise.all([
-      supabase.from('properties').select('id, name'),
-      supabase.from('subscriptions').select('property_id, plan, status')
-    ])
+    const { data: properties, error: propError } = await supabase
+      .from('properties')
+      .select('id, name, plan, expires_at')
 
-    const properties = propertiesRes.data || []
-    const subscriptions = subscriptionsRes.data || []
+    if (propError) throw propError
 
-    const propertyInfoMap = properties.reduce((acc, curr) => {
-      // Find latest subscription
-      const sub = subscriptions
-        .filter(s => s.property_id === curr.id)
-        .reverse()[0] // Get last one or trial
+    const now = new Date()
+
+    const propertyInfoMap = (properties || []).reduce((acc, curr) => {
+      const isExpired = curr.expires_at ? new Date(curr.expires_at) < now : false
       acc[curr.id] = {
         name: curr.name,
-        plan: sub?.plan?.toUpperCase() || 'TRIAL',
-        planStatus: sub?.status || 'active'
+        plan: curr.plan?.toUpperCase() || 'TRIAL',
+        planStatus: isExpired ? 'expired' : 'active'
       }
       return acc
     }, {} as Record<string, { name: string; plan: string; planStatus: string }>)
 
     // 2. Fetch past 6 months list
-    const now = new Date()
     const sixMonthsAgo = new Date()
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5)
     

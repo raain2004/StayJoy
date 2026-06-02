@@ -39,15 +39,7 @@ export async function GET() {
 
     if (convError) throw convError
 
-    // 3. Pending service requests: trang_thai IN ('Mới', 'Đang xử lý')
-    const { count: pendingServiceRequests, error: serviceError } = await supabase
-      .from('service_requests')
-      .select('*', { count: 'exact', head: true })
-      .in('trang_thai', ['Mới', 'Đang xử lý'])
-
-    if (serviceError) throw serviceError
-
-    // 4. Vacancy rate: rooms without active bookings today / total rooms
+    // 3. Vacancy rate: rooms without active bookings today / total rooms
     const { data: allRooms, error: roomsError } = await supabase
       .from('rooms')
       .select('room_id')
@@ -73,7 +65,6 @@ export async function GET() {
     return NextResponse.json({
       totalBookingsThisMonth: totalBookingsThisMonth ?? 0,
       totalConversationsThisMonth: totalConversationsThisMonth ?? 0,
-      pendingServiceRequests: pendingServiceRequests ?? 0,
       vacancyRate,
     })
   } catch (error) {

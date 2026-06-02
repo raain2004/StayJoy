@@ -2,14 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Cpu, LogOut, PieChart, LayoutDashboard, Hotel, Wallet2, MessageSquare, UserPlus, CreditCard } from 'lucide-react'
+import { Cpu, LogOut, PieChart, LayoutDashboard, Hotel, Wallet2, MessageSquare, UserPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
 const navItems = [
   { href: '/admin', label: 'Tổng Quan', icon: LayoutDashboard },
   { href: '/admin/properties', label: 'Properties', icon: Hotel },
-  { href: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
   { href: '/admin/channels', label: 'Channels', icon: MessageSquare },
   { href: '/admin/onboard', label: 'Onboard', icon: UserPlus },
   { href: '/admin/llm-settings', label: 'AI Settings', icon: Cpu },

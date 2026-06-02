@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { buildSystemMessage, KnowledgeSection, Room } from '@/lib/knowledge-base/builder'
 import { callLLM } from '@/lib/llm/provider'
+import { debounceMessage } from '@/lib/message-debounce'
 
 /**
  * POST /api/chatwoot/webhook
@@ -103,6 +104,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'ignored', reason: 'missing ids' })
     }
 
+    // Debounce: gom nhiều tin nhắn liên tiếp từ cùng conversation trong vòng 30 giây
+    const debouncedMessage = debounceMessage(String(conversationId), content)
+
+    if (debouncedMessage === null) {
+      return NextResponse.json({
+        status: 'debounced',
+        message: 'Message queued, waiting for more input',
+      })
+    }
+
+    // Chờ debounce hoàn tất (30s sau tin nhắn cuối cùng)
+    const combinedContent = await debouncedMessage
+
     const supabase = createServiceClient()
 
     // Lookup property_id from inbox_id
@@ -123,14 +137,12 @@ export async function POST(request: NextRequest) {
     const now = new Date()
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
-    const [subscriptionRes, usageRes] = await Promise.all([
+    const [propertyRes, usageRes] = await Promise.all([
       supabase
-        .from('subscriptions')
-        .select('plan, status')
-        .eq('property_id', propertyId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .from('properties')
+        .select('plan, expires_at')
+        .eq('id', propertyId)
+        .single(),
       supabase
         .from('monthly_usages')
         .select('message_count')
@@ -139,8 +151,22 @@ export async function POST(request: NextRequest) {
         .maybeSingle()
     ])
 
-    const plan = subscriptionRes.data?.plan?.toLowerCase() || 'trial'
+    const plan = propertyRes.data?.plan?.toLowerCase() || 'trial'
+    const expiresAt = propertyRes.data?.expires_at
+    const isExpired = expiresAt ? new Date(expiresAt) < now : false
     const messageCount = usageRes.data?.message_count || 0
+
+    if (isExpired) {
+      console.log(`[Chatwoot Webhook] Subscription expired for property=${propertyId}`)
+      const expiredMessage = `⚠️ Hệ thống tự động: Gói dịch vụ của Homestay đã hết hạn sử dụng. Chatbot đã tạm ngưng. Vui lòng truy cập trang Ví & Thanh toán hoặc liên hệ admin để gia hạn gói cước.`
+      await replyToChatwoot(
+        accountId,
+        conversationId,
+        expiredMessage,
+        'private'
+      )
+      return NextResponse.json({ status: 'subscription_expired' })
+    }
 
     const planLimits: Record<string, number> = {
       'trial': 50,
@@ -185,13 +211,51 @@ export async function POST(request: NextRequest) {
 
     // Call LLM
     const llmResponse = await callLLM(
-      { systemMessage, userMessage: content },
+      { systemMessage, userMessage: combinedContent },
       propertyId,
       plan
     )
 
-    // Reply to Chatwoot
-    await replyToChatwoot(accountId, conversationId, llmResponse.answer)
+    // Reply to Chatwoot (strip tag before sending to customer)
+    const cleanAnswer = llmResponse.answer.replace(/\[BOOKING_REQUEST\|[^\]]*\]/g, '').trim()
+    await replyToChatwoot(accountId, conversationId, cleanAnswer)
+
+    // Check if AI detected a booking request (tag in response)
+    const bookingMatch = llmResponse.answer.match(/\[BOOKING_REQUEST\|([^\]]+)\]/)
+    if (bookingMatch) {
+      const tagContent = bookingMatch[1]
+      const fields: Record<string, string> = {}
+      tagContent.split('|').forEach(pair => {
+        const [key, ...valueParts] = pair.split('=')
+        if (key && valueParts.length > 0) {
+          fields[key.trim()] = valueParts.join('=').trim()
+        }
+      })
+
+      // Insert booking request into database
+      const { error: bookingError } = await supabase
+        .from('bookings')
+        .insert({
+          property_id: propertyId,
+          ho_ten: fields.ten || 'Không rõ',
+          sdt: fields.sdt || '',
+          so_phong: fields.phong || '',
+          loai_phong: fields.phong || '',
+          check_in: fields.checkin || new Date().toISOString().split('T')[0],
+          check_out: fields.checkout || fields.checkin || new Date().toISOString().split('T')[0],
+          tinh_trang: 'mới',
+          conversation_id: String(conversationId),
+        })
+
+      if (bookingError) {
+        console.error('[Chatwoot Webhook] Failed to create booking request:', bookingError)
+      } else {
+        // Send private note to owner
+        const privateNote = `🔔 YÊU CẦU ĐẶT PHÒNG MỚI:\n👤 Tên: ${fields.ten || 'N/A'}\n📱 SĐT: ${fields.sdt || 'N/A'}\n📅 Check-in: ${fields.checkin || 'N/A'}\n📅 Check-out: ${fields.checkout || 'N/A'}\n🛏️ Phòng: ${fields.phong || 'N/A'}\n👥 Số người: ${fields.songuoi || 'N/A'}\n\n→ Vui lòng liên hệ khách để xác nhận.`
+        await replyToChatwoot(accountId, conversationId, privateNote, 'private')
+        console.log(`[Chatwoot Webhook] Booking request created for property=${propertyId}`)
+      }
+    }
 
     // Increment usage asynchronously
     supabase.rpc('increment_monthly_usage', {
